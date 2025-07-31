@@ -1,3 +1,7 @@
 # Plagiarizing-detection_P1
-This Program will read two text files and compare them line by line for plagiarism. It will create a pdf with all of the information found on the two .txt files.
-This is Part One of a project that will simulate a teacher's work in grading essays. 
+
+- Splits documents into individual sentences
+- Compares sentence pairs using cosine similarity of TF-IDF vectors
+- Identifies and displays best-matching sentences between two files
+- Supports highlighting of matching phrases (in SequenceMatcher version)
+- Threshold control for sensitivity
