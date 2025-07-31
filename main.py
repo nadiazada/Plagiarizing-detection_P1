@@ -1,6 +1,7 @@
-from difflib import SequenceMatcher
-from fpdf import FPDF
+
 import re
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 #loadind the two file that will be compared and checked for plagiarism
 with open('doc1.txt') as f1, open('doc2.txt') as f2:
@@ -11,50 +12,54 @@ with open('doc1.txt') as f1, open('doc2.txt') as f2:
 def split_sentences(file):
     return re.split(r'(?<=[.!?])\s+', file.strip())
 
-def highlight(s1, s2, threshold = 0.7):
-    matcher = SequenceMatcher(None, s1, s2)
-    ratio = matcher.ratio() 
-    if ratio<threshold:
-        return None, ratio
-    highlighted = ""
-    matches = matcher.get_matching_blocks() # gets a list of all the matching chunks
-                                            #each match is a tuple (start_index_in_s1, start_index_in_s2, length_of_match)
 
-    prev_end = 0
-    
-    for i in matches:
-        start1, _, size = i
-        highlighted += s1[prev_end:start1] #this fills in the gaps between highlighted parts
-        highlighted += f"[=={s1[start1:start1+size]}==]" #the actual highlighted portion
-        prev_end = start1 + size #updates the end of the current match, for the next start
-    return highlighted, ratio
+lines1 = split_sentences(data_file)
+lines2 = split_sentences(data_file2)
 
-line1 = split_sentences(data_file)
-line2 = split_sentences(data_file2)
+all_sentences = lines1+lines2 #combine to fit vectprizer
+vectorizer = TfidfVectorizer().fit(all_sentences)
 
+vectors1 = vectorizer.transform(lines1) 
+vectors2 = vectorizer.transform(lines2)
+
+threshold = 0.3
 matched_sentences = []
 total_score = 0
 numMatched = 0
-# continue to compare sentences to one another and find rhe similarty score of each line 
-for s1 in line1:
-    for s2 in line2:
-        highlighted, score = highlight(s1, s2)
-        if highlighted:
-            matched_sentences.append((highlighted, score))
-            total_score += score
-            numMatched += 1
-            break  # move to next sentence after first match
+#go through each sentence in doc1
+for i in range(vectors1.shape[0]):
+    v1 = vectors1[i]  # get the TF-IDF vector for the curr sentence in doc1
+
+    similarity_scores = []
+
+    #compare this sentence from doc1 with every sentence in doc2
+    for j in range(vectors2.shape[0]):
+        v2 = vectors2[j]  # get the curr sentence from doc2
+        score = cosine_similarity(v1, v2)[0][0]  # calculate cosine similarity
+        similarity_scores.append(score)
+
+    # Find the highest similarity score and the index of the matching sentence
+    max_score = max(similarity_scores)
+    best_match_index = similarity_scores.index(max_score)
+
+    # If it passes the threshold, save the match
+    if max_score >= threshold:
+        s1 = lines1[i]
+        s2 = lines2[best_match_index]
+        matched_sentences.append((s1, s2, max_score))
+        total_score += max_score
+        numMatched += 1
 
 # Print results
 print(f"\nMatched {numMatched} sentence(s).")
 if numMatched > 0:
     print(f"Average similarity score: {total_score / numMatched:.2f}\n")
-    for idx, (sentence, score) in enumerate(matched_sentences, 1):
-        print(f"{idx}. Score: {score:.2f}")
-        print(f"{sentence}\n")
+    for idx, (s1, s2, score) in enumerate(matched_sentences, 1):
+        print(f"{idx}. Similarity Score: {score:.2f}")
+        print(f"Doc1: {s1}")
+        print(f"Doc2: {s2}\n")
 else:
     print("No significant matches found.")
-        
         
 
 # print(f"The plagiarized content is {matches*100}%")
